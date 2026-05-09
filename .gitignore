@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# macOS archive artifacts
+__MACOSX/
+.DS_Store

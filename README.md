@@ -28,6 +28,7 @@ fin-news-sentiment/
 ├── README.md
 ├── requirements.txt
 ├── data/
+│   ├── datasets/          # local copies of benchmark sentiment corpora (see data/datasets/README.md)
 │   ├── raw/
 │   └── processed/
 ├── src/
@@ -44,6 +45,7 @@ fin-news-sentiment/
 ### Folder descriptions
 | Path | Purpose |
 |------|--------|
+| **`data/datasets/`** | Curated **labeled** finance sentiment datasets for modeling / evaluation (not live RSS news). |
 | **`data/raw/`** | Original collected news before cleaning. Example: `raw_news_data.csv` |
 | **`data/processed/`** | Cleaned / analysis-ready data. Examples: `cleaned_news_data.csv`, `sentiment_results.csv`, `ticker_ranking.csv` |
 | **`src/`** | Main Python modules (see below) |
@@ -57,6 +59,19 @@ fin-news-sentiment/
 | `sentiment_analysis.py` | Sentiment per news item |
 | `ticker_ranking.py` | Ticker-level scores and message density |
 | `dashboard.py` | Run the dashboard app |
+| `dataset_loaders.py` | Load benchmark CSV/txt corpora from `data/datasets/` into a common `text` / `label` schema |
+---
+## Labeled benchmark datasets (local)
+
+Three local corpora are organized under `data/datasets/`:
+
+- **Financial PhraseBank v1.0** — sentence-level labels (`Sentences_AllAgree.txt`, plus other agreement cuts).
+- **`all-data.csv`** — two-column file (`label`, `sentence`) for supervised sentiment.
+- **`SEntFiN-v1.1.csv`** — headlines with JSON entity sentiments in `Decisions` (loader derives a simple headline-level label by **majority vote** over entities).
+
+Details, paths, and citation reminders: `data/datasets/README.md`.  
+Quick smoke test (from repo root): `python -m src.dataset_loaders`
+
 ---
 ## Tools and technologies
 - Python  
@@ -156,6 +171,28 @@ streamlit run src/dashboard.py
 | Repository | fin-news-sentiment |
 | Work mode | Remote |
 | Language | Python |
+---
+## Quick start (local pipeline)
+
+From the repository root, create a virtual environment, install dependencies, then run the stages in order:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python -m src.collect_news --demo
+python -m src.clean_data
+python -m src.sentiment_analysis
+python -m src.ticker_ranking
+streamlit run src/dashboard.py
+```
+
+Optional: append one RSS feed (example):
+
+```bash
+python -m src.collect_news --demo --rss https://www.sec.gov/news/pressreleases.rss
+```
+
 ---
 ## Notes
 This project is **under development**. This README will be updated during the internship as code, data pipelines, and dashboard features are added.
