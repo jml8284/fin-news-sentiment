@@ -1,5 +1,5 @@
 ##Financial News Sentiment Analysis Dashboard
-##Project Description
+###Project Description
 
 This project is for my IST 495 Summer 2026 internship. The goal is to build a Python-based financial news sentiment analysis and stock ticker ranking system.
 
