@@ -1,0 +1,7 @@
+ticker,company,sector,price,change_pct,volume,market_cap,pe,source_url
+AAPL,Apple Inc,Technology,210.50,1.25,52000000,3.20T,32.10,demo
+NVDA,NVIDIA Corp,Technology,950.20,2.80,41000000,2.35T,72.40,demo
+TSLA,Tesla Inc,Consumer Cyclical,180.15,-1.40,68000000,575B,45.20,demo
+MSFT,Microsoft Corp,Technology,420.80,0.65,22000000,3.10T,35.50,demo
+AMD,Advanced Micro Devices,Technology,165.30,3.10,35000000,267B,48.90,demo
+AEHL,Antelope Enterprise Holdings,Industrials,2.45,12.50,8900000,12M,-,demo

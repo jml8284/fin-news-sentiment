@@ -1,0 +1,4 @@
+rank,ticker,avg_sentiment,news_count,positive_ratio,negative_ratio,message_density
+1,NVDA,0.8074,1,1.0,0.0,low
+2,AAPL,0.5457,2,1.0,0.0,medium
+3,TSLA,0.0,2,0.0,0.0,medium

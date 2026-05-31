@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+from html import unescape
 from pathlib import Path
 
 import pandas as pd
@@ -16,12 +17,13 @@ CLEAN_OUT = PROC_DIR / "cleaned_news_data.csv"
 
 
 _WS = re.compile(r"\s+")
+_TAG = re.compile(r"<[^>]+>")
 
 
 def clean_text(value: object) -> str:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return ""
-    s = str(value).strip()
+    s = unescape(_TAG.sub(" ", str(value))).strip()
     s = _WS.sub(" ", s)
     return s
 

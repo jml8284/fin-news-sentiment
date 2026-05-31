@@ -1,0 +1,6 @@
+ticker,title,summary,published,source,url,sentiment_neg,sentiment_neu,sentiment_pos,sentiment_compound,sentiment_label
+AAPL,Apple stock rises after strong earnings,Apple reported stronger than expected revenue,2026-05-09,Demo,https://example.com/aapl,0.0,0.629,0.371,0.7096,positive
+TSLA,Tesla shares fall after delivery concerns,Investors reacted negatively to lower delivery numbers,2026-05-09,Demo,https://example.com/tsla,0.143,0.714,0.143,0.0,neutral
+NVDA,Nvidia gains as AI demand remains strong,Analysts remain positive on chip demand,2026-05-09,Demo,https://example.com/nvda,0.148,0.394,0.458,0.8074,positive
+AAPL,Apple services revenue beats estimates,Wall Street notes steady growth in subscriptions,2026-05-08,Demo,https://example.com/aapl2,0.0,0.809,0.191,0.3818,positive
+TSLA,Tesla announces new factory timeline,Markets watch production ramp closely,2026-05-08,Demo,https://example.com/tsla2,0.0,1.0,0.0,0.0,neutral

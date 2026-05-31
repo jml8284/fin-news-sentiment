@@ -47,7 +47,7 @@ fin-news-sentiment/
 |------|--------|
 | **`data/datasets/`** | Curated **labeled** finance sentiment datasets for modeling / evaluation (not live RSS news). |
 | **`data/raw/`** | Original collected news before cleaning. Example: `raw_news_data.csv` |
-| **`data/processed/`** | Cleaned / analysis-ready data. Examples: `cleaned_news_data.csv`, `sentiment_results.csv`, `ticker_ranking.csv` |
+| **`data/processed/`** | Cleaned / analysis-ready data. Examples: `cleaned_news_data.csv`, `sentiment_results.csv`, `ticker_ranking.csv`, `final_dataset.csv` |
 | **`src/`** | Main Python modules (see below) |
 | **`notebooks/`** | Exploratory work. `exploration.ipynb` — tests for cleaning, sentiment, and visualizations |
 | **`reports/weekly_updates/`** | Weekly internship updates (completed work, challenges, next steps, deliverables) |
@@ -58,6 +58,8 @@ fin-news-sentiment/
 | `clean_data.py` | Clean raw data for analysis |
 | `sentiment_analysis.py` | Sentiment per news item |
 | `ticker_ranking.py` | Ticker-level scores and message density |
+| `merge_data.py` | Merge stock screener data with sentiment rankings |
+| `run_pipeline.py` | Run the full pipeline with one command |
 | `dashboard.py` | Run the dashboard app |
 | `dataset_loaders.py` | Load benchmark CSV/txt corpora from `data/datasets/` into a common `text` / `label` schema |
 ---
@@ -149,18 +151,25 @@ streamlit run src/dashboard.py
 ```
 ---
 ## Current status
-**Stage:** Planning and setup.
+**Stage:** Working prototype — end-to-end pipeline with Finviz stocks, per-ticker news, VADER sentiment, merge, and Streamlit dashboard.
+
 ### Completed
-- [x] GitHub repository created  
-- [x] Initial README created  
-- [x] Project topic selected  
-- [x] Planned structure documented  
+- [x] GitHub repository and project structure
+- [x] Finviz stock collection (`collect_stocks.py`)
+- [x] Per-ticker news collection — Google, Yahoo, Finviz (`collect_news.py`)
+- [x] Data cleaning with HTML stripping (`clean_data.py`)
+- [x] VADER baseline sentiment (`sentiment_analysis.py`)
+- [x] Ticker ranking and message density (`ticker_ranking.py`)
+- [x] Stock + sentiment merge (`merge_data.py`)
+- [x] One-command pipeline runner (`run_pipeline.py`)
+- [x] Streamlit dashboard with filters, charts, and news viewer (`dashboard.py`)
+- [x] Benchmark dataset loaders (`dataset_loaders.py`)
+- [x] Weekly updates (weeks 1–4)
+
 ### Next steps
-- [ ] Create project folders  
-- [ ] Add `requirements.txt`  
-- [ ] Test financial news data collection  
-- [ ] First version of the collection script  
-- [ ] Prepare weekly progress updates  
+- [ ] Evaluate VADER on benchmark datasets; consider FinBERT
+- [ ] Add automated tests for parsers and merge logic
+- [ ] Optional scheduled daily collection after market close
 ---
 ## Internship information
 | Item | Detail |
@@ -174,20 +183,48 @@ streamlit run src/dashboard.py
 ---
 ## Quick start (local pipeline)
 
-From the repository root, create a virtual environment, install dependencies, then run the stages in order:
+### One command (demo)
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+python -m src.run_pipeline --demo
+streamlit run src/dashboard.py
+```
+
+### One command (live Finviz + news)
+
+```bash
+python -m src.run_pipeline --top-n 10 --tickers NVDA,F,INTC
+streamlit run src/dashboard.py
+```
+
+### Step by step
+
+```bash
+python -m src.collect_stocks --signal most_active --top-n 10
+python -m src.collect_news --from-stocks --tickers NVDA,F,INTC --sources google,yahoo
+python -m src.clean_data
+python -m src.sentiment_analysis
+python -m src.ticker_ranking
+python -m src.merge_data
+streamlit run src/dashboard.py
+```
+
+Demo-only fallback:
+
+```bash
+python -m src.collect_stocks --demo
 python -m src.collect_news --demo
 python -m src.clean_data
 python -m src.sentiment_analysis
 python -m src.ticker_ranking
+python -m src.merge_data
 streamlit run src/dashboard.py
 ```
 
-Optional: append one RSS feed (example):
+Optional RSS:
 
 ```bash
 python -m src.collect_news --demo --rss https://www.sec.gov/news/pressreleases.rss

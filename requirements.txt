@@ -7,3 +7,5 @@ vaderSentiment>=3.3.2
 streamlit>=1.28.0
 plotly>=5.18.0
 python-dotenv>=1.0.0
+cloudscraper>=1.2.71
+lxml>=4.9.0
