@@ -1,12 +1,13 @@
 """
-Collect financial news from demo CSV, RSS feeds, and per-ticker sources.
+Collect financial news per ticker from production sources.
 
 Writes unified rows to data/raw/raw_news_data.csv
 
-Examples:
+Production (default):
+  python -m src.collect_news --from-stocks --top-n 20
+
+Offline:
   python -m src.collect_news --demo
-  python -m src.collect_news --from-stocks --top-n 5
-  python -m src.collect_news --from-stocks --tickers NVDA,AAPL --sources google,yahoo
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import argparse
 import logging
 import re
 import time
+from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
@@ -31,11 +33,16 @@ DEFAULT_OUT = RAW_DIR / "raw_news_data.csv"
 DEMO_CSV = RAW_DIR / "demo_mock_news.csv"
 STOCKS_DEFAULT = RAW_DIR / "raw_stock_data.csv"
 
-NEWS_COLUMNS = ["ticker", "title", "summary", "published", "source", "url"]
-AVAILABLE_SOURCES = ("google", "yahoo", "finviz")
+NEWS_COLUMNS = ["ticker", "title", "summary", "published", "collected_at", "source", "url"]
+AVAILABLE_SOURCES = ("google", "yahoo", "finviz", "sec")
+SEC_PRESS_RSS = "https://www.sec.gov/news/pressreleases.rss"
 _TAG_RE = re.compile(r"<[^>]+>")
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def _ensure_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -135,6 +142,7 @@ def fetch_rss_entries(
                 "title": _strip_html(title),
                 "summary": _strip_html(summary),
                 "published": published.strip(),
+                "collected_at": _utc_now(),
                 "source": host,
                 "url": link.strip(),
             }
@@ -178,65 +186,191 @@ def fetch_yahoo_news(ticker: str, *, max_items: int = 10) -> pd.DataFrame:
     )
 
 
+def fetch_sec_news(ticker: str, *, max_items: int = 10) -> pd.DataFrame:
+    """
+    Filter SEC press release RSS for items mentioning the ticker symbol.
+    Many small tickers may return zero rows (expected).
+    """
+    parsed = feedparser.parse(SEC_PRESS_RSS)
+    rows: list[dict[str, str]] = []
+    symbol = ticker.upper().strip()
+    if not symbol:
+        return pd.DataFrame(columns=NEWS_COLUMNS)
+
+    for entry in getattr(parsed, "entries", []):
+        title = getattr(entry, "title", "") or ""
+        summary = ""
+        if hasattr(entry, "summary"):
+            summary = entry.summary or ""
+        blob = f"{title} {summary}".upper()
+        if symbol not in blob:
+            continue
+
+        published = ""
+        if hasattr(entry, "published"):
+            published = entry.published or ""
+        link = getattr(entry, "link", "") or ""
+
+        rows.append(
+            {
+                "ticker": symbol,
+                "title": _strip_html(title),
+                "summary": _strip_html(summary),
+                "published": published.strip(),
+                "collected_at": _utc_now(),
+                "source": "SEC",
+                "url": link.strip(),
+            }
+        )
+        if len(rows) >= max_items:
+            break
+
+    return pd.DataFrame(rows)
+
+
+def _find_finviz_news_table(soup: BeautifulSoup) -> object | None:
+    table = soup.select_one("table.fullview-news-outer")
+    if table is not None:
+        return table
+    table = soup.find("table", id="news-table")
+    if table is not None:
+        return table
+    for candidate in soup.select("table.news-table"):
+        return candidate
+    return None
+
+
+def _normalize_finviz_href(href: str) -> str:
+    href = (href or "").strip()
+    if not href:
+        return ""
+    if href.startswith("http"):
+        return href
+    if href.startswith("//"):
+        return "https:" + href
+    if href.startswith("/"):
+        return "https://finviz.com" + href
+    return href
+
+
+def parse_finviz_news_html(
+    html: str,
+    ticker: str,
+    *,
+    source_label: str = "Finviz Elite",
+    max_items: int = 0,
+) -> pd.DataFrame:
+    """Parse Finviz quote/stock page HTML into news rows."""
+    soup = BeautifulSoup(html, "html.parser")
+    table = _find_finviz_news_table(soup)
+    if table is None:
+        return pd.DataFrame(columns=NEWS_COLUMNS)
+
+    rows: list[dict[str, str]] = []
+    date_prefix = ""
+    for tr in table.find_all("tr"):
+        cells = tr.find_all("td")
+        if len(cells) < 2:
+            continue
+        time_cell = cells[0].get_text(" ", strip=True)
+        link = cells[1].find("a")
+        if link is None:
+            continue
+        title = link.get_text(strip=True)
+        if not title:
+            continue
+        href = _normalize_finviz_href(link.get("href", ""))
+
+        if time_cell:
+            first_token = time_cell.split()[0]
+            if "-" in first_token:
+                date_prefix = first_token
+                published = time_cell
+            elif date_prefix:
+                published = f"{date_prefix} {time_cell}".strip()
+            else:
+                published = time_cell
+        else:
+            published = date_prefix
+
+        rows.append(
+            {
+                "ticker": ticker.upper(),
+                "title": title,
+                "summary": "",
+                "published": published,
+                "collected_at": _utc_now(),
+                "source": source_label,
+                "url": href,
+            }
+        )
+        if max_items > 0 and len(rows) >= max_items:
+            break
+
+    return pd.DataFrame(rows)
+
+
+def _finviz_news_page_urls(ticker: str, token: str | None, *, use_elite: bool) -> list[str]:
+    sym = quote_plus(ticker.upper())
+    if use_elite and token:
+        return [
+            build_elite_stock_url(ticker, token),
+            f"https://elite.finviz.com/quote.ashx?t={sym}&auth={token}",
+        ]
+    if use_elite:
+        return [build_elite_stock_url(ticker, None)]
+    return [f"https://finviz.com/quote.ashx?t={sym}"]
+
+
 def fetch_finviz_news(
     ticker: str,
     *,
-    max_items: int = 10,
+    max_items: int = 0,
     auth_token: str | None = None,
     use_elite: bool = True,
 ) -> pd.DataFrame:
     """
-    Fetch news from Finviz quote/stock page.
+    Fetch news from Finviz quote/stock page (live HTML scrape).
 
-    Uses Elite stock URL (stock?t=TICKER) when use_elite=True, which matches
-    the professor's chart page link pattern instead of the free export URL.
+    max_items=0 means no cap (collect every row Finviz returns on the page).
     """
-    if use_elite:
-        token = auth_token
-        if token is None:
-            try:
-                token = get_api_token(None)
-            except RuntimeError:
-                token = None
-        url = build_elite_stock_url(ticker, token)
-        source_label = "Finviz Elite"
-    else:
-        url = f"https://finviz.com/quote.ashx?t={quote_plus(ticker)}"
-        source_label = "Finviz"
+    token = auth_token
+    if use_elite and token is None:
+        try:
+            token = get_api_token(None)
+        except RuntimeError:
+            token = None
 
-    html = fetch_html(url)
-    soup = BeautifulSoup(html, "html.parser")
+    source_label = "Finviz Elite" if use_elite else "Finviz"
     rows: list[dict[str, str]] = []
+    last_html_len = 0
 
-    for table in soup.select("table.fullview-news-outer, table#news-table, table.news-table"):
-        for tr in table.find_all("tr"):
-            cells = tr.find_all("td")
-            if len(cells) < 2:
-                continue
-            published = cells[0].get_text(strip=True)
-            link = cells[1].find("a")
-            if link is None:
-                continue
-            title = link.get_text(strip=True)
-            href = link.get("href", "").strip()
-            if not title:
-                continue
-            rows.append(
-                {
-                    "ticker": ticker,
-                    "title": title,
-                    "summary": "",
-                    "published": published,
-                    "source": source_label,
-                    "url": href,
-                }
+    for url in _finviz_news_page_urls(ticker, token, use_elite=use_elite):
+        try:
+            html = fetch_html(url)
+            last_html_len = len(html)
+            parsed = parse_finviz_news_html(
+                html,
+                ticker,
+                source_label=source_label,
+                max_items=max_items if max_items > 0 else 0,
             )
-            if len(rows) >= max_items:
-                break
-        if rows:
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Finviz news fetch failed for %s (%s): %s", ticker, url, exc)
+            continue
+        if not parsed.empty:
+            return parsed
+        if max_items > 0 and len(rows) >= max_items:
             break
 
-    return pd.DataFrame(rows)
+    if not rows and last_html_len > 0:
+        logger.warning(
+            "Finviz news table not found for %s (html bytes=%s). Check Elite page markup.",
+            ticker,
+            last_html_len,
+        )
+
+    return pd.DataFrame(rows, columns=NEWS_COLUMNS) if rows else pd.DataFrame(columns=NEWS_COLUMNS)
 
 
 def collect_news_for_ticker(
@@ -244,6 +378,7 @@ def collect_news_for_ticker(
     *,
     sources: list[str],
     max_items_per_source: int = 10,
+    finviz_max_items: int = 0,
     finviz_elite: bool = True,
 ) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
@@ -266,6 +401,7 @@ def collect_news_for_ticker(
         "google": fetch_google_news,
         "yahoo": fetch_yahoo_news,
         "finviz": _finviz_fetch,
+        "sec": fetch_sec_news,
     }
 
     for source in sources:
@@ -273,7 +409,8 @@ def collect_news_for_ticker(
         if fetcher is None:
             continue
         try:
-            df = fetcher(ticker, max_items=max_items_per_source)
+            limit = finviz_max_items if source == "finviz" else max_items_per_source
+            df = fetcher(ticker, max_items=limit)
             if not df.empty:
                 frames.append(df)
         except Exception as exc:  # noqa: BLE001 - continue other sources/tickers
@@ -289,6 +426,7 @@ def collect_news_for_tickers(
     *,
     sources: list[str],
     max_items_per_source: int = 10,
+    finviz_max_items: int = 0,
     sleep_seconds: float = 0.5,
     finviz_elite: bool = True,
 ) -> tuple[pd.DataFrame, list[str]]:
@@ -300,6 +438,7 @@ def collect_news_for_tickers(
             ticker,
             sources=sources,
             max_items_per_source=max_items_per_source,
+            finviz_max_items=finviz_max_items,
             finviz_elite=finviz_elite,
         )
         if df.empty:
@@ -330,7 +469,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     parser = argparse.ArgumentParser(description="Collect financial news (demo CSV and/or RSS).")
-    parser.add_argument("--demo", action="store_true", help="Load rows from demo_mock_news.csv")
+    parser.add_argument("--demo", action="store_true", help="Load rows from demo_mock_news.csv (offline only)")
     parser.add_argument(
         "--from-stocks",
         action="store_true",
@@ -355,7 +494,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--sources",
-        default="google,yahoo,finviz",
+        default="finviz,google,yahoo,sec",
         help=f"Comma-separated sources: {','.join(AVAILABLE_SOURCES)}",
     )
     parser.add_argument(
@@ -375,7 +514,13 @@ def main() -> None:
         "--max-items-per-source",
         type=int,
         default=10,
-        help="Max items per ticker/source when using --from-stocks",
+        help="Max items per ticker for Google/Yahoo/SEC",
+    )
+    parser.add_argument(
+        "--finviz-max-items",
+        type=int,
+        default=0,
+        help="Max Finviz quote-page news rows per ticker (0 = no cap, collect all on page)",
     )
     parser.add_argument(
         "--finviz-free",
@@ -390,6 +535,9 @@ def main() -> None:
     )
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="Output CSV path")
     args = parser.parse_args()
+
+    if not args.demo and not args.from_stocks and not args.rss:
+        args.from_stocks = True
 
     sources = [s.strip().lower() for s in args.sources.split(",") if s.strip()]
     unknown = sorted(set(sources) - set(AVAILABLE_SOURCES))
@@ -413,6 +561,7 @@ def main() -> None:
             tickers,
             sources=sources,
             max_items_per_source=args.max_items_per_source,
+            finviz_max_items=args.finviz_max_items,
             sleep_seconds=args.sleep,
             finviz_elite=not args.finviz_free,
         )

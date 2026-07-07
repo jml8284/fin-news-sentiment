@@ -220,3 +220,6 @@ __marimo__/
 # macOS archive artifacts
 __MACOSX/
 .DS_Store
+
+# Local editor/assistant state
+.cursor/

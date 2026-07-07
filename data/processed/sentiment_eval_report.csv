@@ -1,0 +1,5 @@
+model,dataset,samples,accuracy,macro_f1,positive_acc,neutral_acc,negative_acc
+vader,phrasebank,2264,0.5711,0.4871,0.7368,0.5787,0.2244
+vader,combined,4846,0.5433,0.4889,0.7073,0.5172,0.298
+finbert,phrasebank,2264,0.7566,0.78,0.9754,0.6168,0.9868
+finbert,combined,4846,0.6428,0.6777,0.9751,0.4137,0.9851

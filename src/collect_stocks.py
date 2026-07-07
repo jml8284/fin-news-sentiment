@@ -173,6 +173,7 @@ def build_screener_url(
 
 def _fetch_with_requests(url: str, timeout: int) -> str:
     session = requests.Session()
+    session.trust_env = False
     session.headers.update(DEFAULT_HEADERS)
     resp = session.get(url, timeout=timeout)
     resp.raise_for_status()
@@ -190,6 +191,7 @@ def _fetch_with_cloudscraper(url: str, timeout: int) -> str:
     scraper = cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "darwin", "mobile": False}
     )
+    scraper.trust_env = False
     resp = scraper.get(url, timeout=timeout)
     resp.raise_for_status()
     if len(resp.text) < 1000:
@@ -339,6 +341,7 @@ def normalize_elite_export(
 def fetch_elite_export_csv(export_url: str, *, timeout: int = 30) -> pd.DataFrame:
     """Download screener results as CSV from Finviz Elite export endpoint."""
     session = requests.Session()
+    session.trust_env = False
     session.headers.update(DEFAULT_HEADERS)
     resp = session.get(export_url, timeout=timeout)
     resp.raise_for_status()
@@ -353,7 +356,9 @@ def collect_finviz_elite_export(
     filters: str,
     order: str = "-change",
     filter_type: str = "3",
-    view: int = 111,
+    view: int = 151,
+    columns: str | None = None,
+    after_row: int | None = None,
     top_n: int = 20,
 ) -> pd.DataFrame:
     """
@@ -368,6 +373,8 @@ def collect_finviz_elite_export(
         order=order,
         filter_type=filter_type,
         view=view,
+        columns=columns,
+        after_row=after_row,
     )
     raw = fetch_elite_export_csv(export_url)
     normalized = normalize_elite_export(raw, auth_token=auth_token, export_url=export_url)
@@ -447,11 +454,16 @@ def save_raw(df: pd.DataFrame, out_path: Path = DEFAULT_OUT) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Collect stock data from Finviz screener.")
-    parser.add_argument("--demo", action="store_true", help="Use local demo_mock_stocks.csv")
+    parser.add_argument("--demo", action="store_true", help="Use local demo_mock_stocks.csv (offline only)")
     parser.add_argument(
         "--elite",
         action="store_true",
-        help="Use Finviz Elite export API (requires FINVIZ_API_TOKEN in .env)",
+        help="Use Finviz Elite export API (default when neither --demo nor --free-scrape)",
+    )
+    parser.add_argument(
+        "--free-scrape",
+        action="store_true",
+        help="Use free Finviz HTML screener scrape (no Elite token)",
     )
     parser.add_argument(
         "--auth-token",
@@ -509,31 +521,7 @@ def main() -> None:
 
     if args.demo:
         df = load_demo_to_dataframe()
-    elif args.elite:
-        token = get_api_token(args.auth_token or None)
-        preset = PRESET_TECHNICAL_GAINERS
-        if args.preset != "technical-gainers":
-            preset = PRESET_TECHNICAL_GAINERS
-        extra = list(args.extra_filters)
-        filters = preset["filters"]
-        if extra:
-            filters = ",".join([filters, *extra])
-        df = collect_finviz_elite_export(
-            auth_token=token,
-            filters=filters,
-            order=preset["order"],
-            filter_type=str(preset["filter_type"]),
-            view=int(preset["view"]),
-            top_n=args.top_n,
-        )
-        screener_url = build_elite_screener_url(
-            filters=preset["filters"],
-            order=preset["order"],
-            filter_type=str(preset["filter_type"]),
-            view=int(preset["view"]),
-        )
-        print(f"Elite screener: {screener_url}")
-    else:
+    elif args.free_scrape:
         df = collect_finviz_stocks(
             top_n=args.top_n,
             exchange=args.exchange,
@@ -544,9 +532,35 @@ def main() -> None:
             extra_filters=args.extra_filters,
             sleep_seconds=args.sleep,
         )
+    else:
+        # Production default: Finviz Elite export
+        token = get_api_token(args.auth_token or None)
+        preset = PRESET_TECHNICAL_GAINERS
+        extra = list(args.extra_filters)
+        filters = preset["filters"]
+        if extra:
+            filters = ",".join([filters, *extra])
+        df = collect_finviz_elite_export(
+            auth_token=token,
+            filters=filters,
+            order=preset["order"],
+            filter_type=str(preset["filter_type"]),
+            view=int(preset["view"]),
+            columns=preset.get("columns"),
+            top_n=args.top_n,
+        )
+        screener_url = build_elite_screener_url(
+            filters=preset["filters"],
+            order=preset["order"],
+            filter_type=str(preset["filter_type"]),
+            view=int(preset["view"]),
+        )
+        print(f"Elite screener: {screener_url}")
 
     if df.empty:
-        raise RuntimeError("No stock rows collected. Try --demo or different filters.")
+        raise RuntimeError(
+            "No stock rows collected. Check FINVIZ_API_TOKEN in .env or try --free-scrape / --demo."
+        )
 
     out = save_raw(df, args.out)
     print(f"Wrote {len(df)} rows to {out}")

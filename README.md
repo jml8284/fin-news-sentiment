@@ -151,7 +151,7 @@ streamlit run src/dashboard.py
 ```
 ---
 ## Current status
-**Stage:** Working prototype — end-to-end pipeline with Finviz stocks, per-ticker news, VADER sentiment, merge, and Streamlit dashboard.
+**Stage:** Production pipeline — Finviz Elite 20-stock screener, per-ticker news, VADER sentiment, merge, Streamlit dashboard (demo optional for offline dev).
 
 ### Completed
 - [x] GitHub repository and project structure
@@ -167,9 +167,10 @@ streamlit run src/dashboard.py
 - [x] Weekly updates (weeks 1–4)
 
 ### Next steps
-- [ ] Evaluate VADER on benchmark datasets; consider FinBERT
+- [ ] Review VADER eval report; consider FinBERT if accuracy is low
+- [ ] Social news sources (Stocktwits) per professor roadmap
+- [ ] Redis caching for faster refresh
 - [ ] Add automated tests for parsers and merge logic
-- [ ] Optional scheduled daily collection after market close
 ---
 ## Internship information
 | Item | Detail |
@@ -181,30 +182,45 @@ streamlit run src/dashboard.py
 | Work mode | Remote |
 | Language | Python |
 ---
-## Quick start (local pipeline)
+## Quick start (production)
 
-### One command (demo)
+### 1. Setup
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -m src.run_pipeline --demo
-streamlit run src/dashboard.py
+cp .env.example .env
 ```
 
-### One command (live Finviz + news)
+Add your **Finviz Elite API token** to `.env`:
 
 ```bash
-python -m src.run_pipeline --top-n 10 --tickers NVDA,F,INTC
+FINVIZ_API_TOKEN=your-token-here
+```
+
+Get the token from: https://elite.finviz.com/api_explanation
+
+### 2. Run pipeline (default: 20-stock Technical screener)
+
+```bash
+python -m src.run_pipeline --evaluate
 streamlit run src/dashboard.py
 ```
+
+This runs:
+1. Finviz Elite export — professor Technical filters (`change up`, high volume)
+2. News per ticker — Finviz Elite + Google + Yahoo + SEC
+3. Clean → VADER sentiment → rank → merge → `final_dataset.csv`
+4. VADER benchmark evaluation → `vader_eval_report.csv`
+
+Optional MongoDB: `python -m src.run_pipeline --evaluate --mongo`
 
 ### Step by step
 
 ```bash
-python -m src.collect_stocks --signal most_active --top-n 10
-python -m src.collect_news --from-stocks --tickers NVDA,F,INTC --sources google,yahoo
+python -m src.collect_stocks --elite --top-n 20
+python -m src.collect_news --from-stocks --top-n 20
 python -m src.clean_data
 python -m src.sentiment_analysis
 python -m src.ticker_ranking
@@ -212,22 +228,10 @@ python -m src.merge_data
 streamlit run src/dashboard.py
 ```
 
-Demo-only fallback:
+### Offline demo (development only)
 
 ```bash
-python -m src.collect_stocks --demo
-python -m src.collect_news --demo
-python -m src.clean_data
-python -m src.sentiment_analysis
-python -m src.ticker_ranking
-python -m src.merge_data
-streamlit run src/dashboard.py
-```
-
-Optional RSS:
-
-```bash
-python -m src.collect_news --demo --rss https://www.sec.gov/news/pressreleases.rss
+python -m src.run_pipeline --demo
 ```
 
 ---

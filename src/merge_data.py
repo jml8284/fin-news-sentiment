@@ -32,9 +32,11 @@ FINAL_COLUMNS = [
     "pe",
     "avg_sentiment",
     "news_count",
+    "supplemental_news_count",
     "positive_ratio",
     "negative_ratio",
     "message_density",
+    "rolling_news_count",
 ]
 
 

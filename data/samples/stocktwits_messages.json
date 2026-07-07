@@ -1,0 +1,86 @@
+[
+  {
+    "ticker": "AAPL",
+    "title": "$AAPL Hovering around previous high set towards the end of last year. Under $280, push towards $275 would intensify.",
+    "published_offset_days": 0,
+    "stocktwits_sentiment": "Bearish",
+    "message_id": "657872845"
+  },
+  {
+    "ticker": "AAPL",
+    "title": "Bullish on $AAPL into earnings — services growth still the story.",
+    "published_offset_days": 1,
+    "stocktwits_sentiment": "Bullish",
+    "message_id": "657871712"
+  },
+  {
+    "ticker": "AAPL",
+    "title": "$AAPL $280 till next product rollout?",
+    "published_offset_days": 2,
+    "stocktwits_sentiment": "",
+    "message_id": "657847426"
+  },
+  {
+    "ticker": "TSLA",
+    "title": "$TSLA delivery numbers matter more than the headline price action this week.",
+    "published_offset_days": 0,
+    "stocktwits_sentiment": "Bullish",
+    "message_id": "657870201"
+  },
+  {
+    "ticker": "TSLA",
+    "title": "Trimming $TSLA into strength — margin worries back on the table.",
+    "published_offset_days": 3,
+    "stocktwits_sentiment": "Bearish",
+    "message_id": "657869879"
+  },
+  {
+    "ticker": "NVDA",
+    "title": "$NVDA still the AI trade anchor — watching $195 support.",
+    "published_offset_days": 1,
+    "stocktwits_sentiment": "Bullish",
+    "message_id": "657868861"
+  },
+  {
+    "ticker": "NVDA",
+    "title": "$NVDA feels extended here, taking some off the table.",
+    "published_offset_days": 4,
+    "stocktwits_sentiment": "Bearish",
+    "message_id": "657868076"
+  },
+  {
+    "ticker": "MSFT",
+    "title": "$MSFT cloud numbers should keep sentiment constructive.",
+    "published_offset_days": 2,
+    "stocktwits_sentiment": "Bullish",
+    "message_id": "657867326"
+  },
+  {
+    "ticker": "MSFT",
+    "title": "Adding $MSFT on this dip — quality compounder.",
+    "published_offset_days": 5,
+    "stocktwits_sentiment": "Bullish",
+    "message_id": "657866737"
+  },
+  {
+    "ticker": "META",
+    "title": "$META ad spend recovery still underappreciated IMO.",
+    "published_offset_days": 1,
+    "stocktwits_sentiment": "Bullish",
+    "message_id": "657865001"
+  },
+  {
+    "ticker": "AMZN",
+    "title": "$AMZN AWS re-acceleration would change the narrative fast.",
+    "published_offset_days": 3,
+    "stocktwits_sentiment": "",
+    "message_id": "657864002"
+  },
+  {
+    "ticker": "GOOG",
+    "title": "$GOOG search moat + AI capex debate continues.",
+    "published_offset_days": 2,
+    "stocktwits_sentiment": "",
+    "message_id": "657863003"
+  }
+]

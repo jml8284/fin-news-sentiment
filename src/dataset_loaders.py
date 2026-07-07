@@ -79,7 +79,7 @@ def load_combined_two_column_csv(path: Path | None = None) -> pd.DataFrame:
         path,
         header=None,
         names=["label", "text"],
-        encoding="utf-8",
+        encoding="latin-1",
         engine="python",
         on_bad_lines="skip",
     )

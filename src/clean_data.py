@@ -30,7 +30,7 @@ def clean_text(value: object) -> str:
 
 def clean_frame(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    for col in ("title", "summary", "source", "url", "ticker", "published"):
+    for col in ("title", "summary", "source", "url", "ticker", "published", "collected_at"):
         if col in df.columns:
             df[col] = df[col].map(clean_text)
     df = df.drop_duplicates(subset=["url", "title"], keep="first")

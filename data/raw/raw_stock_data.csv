@@ -1,7 +1,21 @@
 ticker,company,sector,price,change_pct,volume,market_cap,pe,source_url
-AAPL,Apple Inc,Technology,210.5,1.25,52000000,3.20T,32.10,demo
-NVDA,NVIDIA Corp,Technology,950.2,2.8,41000000,2.35T,72.40,demo
-TSLA,Tesla Inc,Consumer Cyclical,180.15,-1.4,68000000,575B,45.20,demo
-MSFT,Microsoft Corp,Technology,420.8,0.65,22000000,3.10T,35.50,demo
-AMD,Advanced Micro Devices,Technology,165.3,3.1,35000000,267B,48.90,demo
-AEHL,Antelope Enterprise Holdings,Industrials,2.45,12.5,8900000,12M,-,demo
+ADTX,Aditxt Inc,,0.01,127.27,5383006389,0.01,,https://elite.finviz.com/stock?t=ADTX&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+LNKS,Linkers Industries Ltd,,2.68,67.5,69879693,4.75,,https://elite.finviz.com/stock?t=LNKS&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+CAST,Freecast Inc,,8.07,56.7,113021411,333.63,,https://elite.finviz.com/stock?t=CAST&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+BFLY,Butterfly Network Inc,,8.9,55.87,60481423,2325.3,,https://elite.finviz.com/stock?t=BFLY&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+CDT,CDT Equity Inc,,1.02,47.19,249471140,4.96,,https://elite.finviz.com/stock?t=CDT&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+APWC,Asia Pacific Wire & Cable Corp Ltd,,1.99,43.17,48089946,41.03,,https://elite.finviz.com/stock?t=APWC&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+ATPC,Agape ATP Corp,,3.88,42.12,72449876,3.88,,https://elite.finviz.com/stock?t=ATPC&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+BESS,Bimergen Energy Corp,,5.82,37.91,2584625,41.31,,https://elite.finviz.com/stock?t=BESS&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+HQ,Horizon Quantum Holdings Ltd,,32.0,35.54,8691692,1018.67,,https://elite.finviz.com/stock?t=HQ&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+QSU,Defiance Daily Target 2X Long QS ETF,,15.35,33.25,708007,nan,,https://elite.finviz.com/stock?t=QSU&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+NEOV,NeoVolta Inc,,2.78,31.13,17504193,157.37,,https://elite.finviz.com/stock?t=NEOV&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+BEX,Tradr 2X Long BE Daily ETF,,76.58,31.13,1054359,nan,,https://elite.finviz.com/stock?t=BEX&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+BEG,Leverage Shares 2x Long BE Daily ETF,,107.47,30.1,148091,nan,,https://elite.finviz.com/stock?t=BEG&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+MDCX,Medicus Pharma Ltd,,0.46,30.08,12185095,25.92,,https://elite.finviz.com/stock?t=MDCX&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+WYFL,Defiance Daily Target 2X Long WYFI ETF,,32.93,30.0,105928,nan,,https://elite.finviz.com/stock?t=WYFL&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+EXFY,Expensify Inc,,1.56,30.0,12528622,150.44,,https://elite.finviz.com/stock?t=EXFY&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+KALA,Kala Bio Inc,,3.61,26.89,959164,67.11,,https://elite.finviz.com/stock?t=KALA&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+OM,Outset Medical Inc,,5.05,25.62,525986,93.51,,https://elite.finviz.com/stock?t=OM&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+LEUX,Tradr 2X Long LEU Daily ETF,,16.44,25.5,110661,nan,,https://elite.finviz.com/stock?t=LEUX&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2
+SMUP,T-REX 2X Long SMR Daily Target ETF,,9.11,25.48,665899,nan,,https://elite.finviz.com/stock?t=SMUP&ty=c&p=i1&auth=9edd0295-d2c1-405b-8c5d-fe1f5c44e5b2

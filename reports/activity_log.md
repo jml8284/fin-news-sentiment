@@ -99,16 +99,49 @@ Need to hand-draw or software-sketch front end + secondary layers for Canvas (se
 
 ---
 
+## Week 5 · June 1–7
+
+### Production + evaluation
+
+- Pipeline **defaults to Finviz Elite** (no `--demo` flag needed).
+- `evaluate_sentiment.py` → `vader_eval_report.csv` (PhraseBank 57.1%, combined 54.3%).
+- SEC RSS added to `collect_news.py`; `collected_at` on news rows.
+- `store_mongo.py` + `--mongo` flag (optional).
+- Dashboard: sentiment **pie chart**; news sorted by published/collected_at.
+
+### Verified production run
+
+```bash
+python -m src.run_pipeline --evaluate
+streamlit run src/dashboard.py
+```
+
+Real screener tickers (e.g. SUGP, STI, SNBR) visible in dashboard — not demo AAPL/TSLA.
+
+Wrote `reports/weekly_updates/week5_update.md`.  
+Activity log docx: `~/Downloads/IST495_Week5_Activity_Log_Jinyang_Liu.docx`.
+
+### Still open
+
+- GitHub push (PAT)
+- Mockup assignment for Canvas
+- FinBERT / social / Redis — Week 6+
+
+Full chat memory: `reports/conversation_memory.md`.
+
+---
+
 ## Commands I use
 
 ```bash
 source .venv/bin/activate
 
-python -m src.run_pipeline --demo
+# Production (needs .env FINVIZ_API_TOKEN)
+python -m src.run_pipeline --evaluate
 streamlit run src/dashboard.py
 
-# Elite screener (needs .env token)
-python -m src.run_pipeline --elite
+# Demo / offline
+python -m src.run_pipeline --demo
 ```
 
 ---
@@ -118,8 +151,8 @@ python -m src.run_pipeline --elite
 - Small tickers often have no news — test with NVDA, F, INTC
 - Proxy can block Finviz; `--demo` is fine for presentations
 - Never commit `.env`
-- Benchmark eval / FinBERT — not started yet
+- VADER weak on negative financial text — FinBERT candidate for Week 6
 
 ---
 
-*Last updated: Week 4 (May 25–31, 2026)*
+*Last updated: Week 5 (June 1–7, 2026)*
