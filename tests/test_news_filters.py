@@ -32,6 +32,7 @@ def test_ticker_specific_recent_kept() -> None:
         "SCAG",
         company="Scage Future ADR",
         published="Sun, 14 Jun 2026 20:38:54 GMT",
+        max_age_days=60,
     )
 
 

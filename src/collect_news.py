@@ -34,8 +34,20 @@ DEMO_CSV = RAW_DIR / "demo_mock_news.csv"
 STOCKS_DEFAULT = RAW_DIR / "raw_stock_data.csv"
 
 NEWS_COLUMNS = ["ticker", "title", "summary", "published", "collected_at", "source", "url"]
-AVAILABLE_SOURCES = ("google", "yahoo", "finviz", "sec")
 SEC_PRESS_RSS = "https://www.sec.gov/news/pressreleases.rss"
+RSS_SOURCE_FEEDS = {
+    "globalwire": (
+        "GlobeNewswire",
+        "https://www.globenewswire.com/RssFeed/orgclass/1/feedTitle/GlobeNewswire%20-%20News%20about%20Public%20Companies",
+    ),
+    "prnewswire": ("PR Newswire", "https://www.prnewswire.com/rss/news-releases-list.rss"),
+    "sec": ("SEC", SEC_PRESS_RSS),
+    "fda": (
+        "FDA",
+        "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml",
+    ),
+}
+AVAILABLE_SOURCES = ("google", "yahoo", "finviz", *RSS_SOURCE_FEEDS.keys())
 _TAG_RE = re.compile(r"<[^>]+>")
 
 logger = logging.getLogger(__name__)
@@ -57,6 +69,16 @@ def _strip_html(value: object) -> str:
         return ""
     text = unescape(_TAG_RE.sub(" ", str(value)))
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _mentions_ticker(title: str, summary: str, ticker: str) -> bool:
+    symbol = ticker.upper().strip()
+    if not symbol:
+        return True
+    text = f"{title} {summary}".upper()
+    if f"${symbol}" in text:
+        return True
+    return re.search(rf"(?<![A-Z0-9]){re.escape(symbol)}(?![A-Z0-9])", text) is not None
 
 
 def load_demo_to_dataframe() -> pd.DataFrame:
@@ -151,6 +173,46 @@ def fetch_rss_entries(
     return pd.DataFrame(rows)
 
 
+def fetch_named_rss_news(
+    ticker: str,
+    *,
+    source: str,
+    max_items: int = 10,
+) -> pd.DataFrame:
+    label, feed_url = RSS_SOURCE_FEEDS[source]
+    parsed = feedparser.parse(feed_url)
+    rows: list[dict[str, str]] = []
+    symbol = ticker.upper().strip()
+
+    for entry in getattr(parsed, "entries", []):
+        title = _strip_html(getattr(entry, "title", "") or "")
+        summary = _strip_html(
+            getattr(entry, "summary", "")
+            or getattr(entry, "description", "")
+            or ""
+        )
+        if symbol and not _mentions_ticker(title, summary, symbol):
+            continue
+
+        published = (getattr(entry, "published", "") or getattr(entry, "updated", "") or "").strip()
+        link = (getattr(entry, "link", "") or "").strip()
+        rows.append(
+            {
+                "ticker": symbol,
+                "title": title,
+                "summary": summary,
+                "published": published,
+                "collected_at": _utc_now(),
+                "source": label,
+                "url": link,
+            }
+        )
+        if len(rows) >= max_items:
+            break
+
+    return pd.DataFrame(rows, columns=NEWS_COLUMNS)
+
+
 def google_news_feed_url(ticker: str) -> str:
     query = quote_plus(f"{ticker} stock")
     return (
@@ -191,41 +253,7 @@ def fetch_sec_news(ticker: str, *, max_items: int = 10) -> pd.DataFrame:
     Filter SEC press release RSS for items mentioning the ticker symbol.
     Many small tickers may return zero rows (expected).
     """
-    parsed = feedparser.parse(SEC_PRESS_RSS)
-    rows: list[dict[str, str]] = []
-    symbol = ticker.upper().strip()
-    if not symbol:
-        return pd.DataFrame(columns=NEWS_COLUMNS)
-
-    for entry in getattr(parsed, "entries", []):
-        title = getattr(entry, "title", "") or ""
-        summary = ""
-        if hasattr(entry, "summary"):
-            summary = entry.summary or ""
-        blob = f"{title} {summary}".upper()
-        if symbol not in blob:
-            continue
-
-        published = ""
-        if hasattr(entry, "published"):
-            published = entry.published or ""
-        link = getattr(entry, "link", "") or ""
-
-        rows.append(
-            {
-                "ticker": symbol,
-                "title": _strip_html(title),
-                "summary": _strip_html(summary),
-                "published": published.strip(),
-                "collected_at": _utc_now(),
-                "source": "SEC",
-                "url": link.strip(),
-            }
-        )
-        if len(rows) >= max_items:
-            break
-
-    return pd.DataFrame(rows)
+    return fetch_named_rss_news(ticker, source="sec", max_items=max_items)
 
 
 def _find_finviz_news_table(soup: BeautifulSoup) -> object | None:
@@ -401,8 +429,15 @@ def collect_news_for_ticker(
         "google": fetch_google_news,
         "yahoo": fetch_yahoo_news,
         "finviz": _finviz_fetch,
-        "sec": fetch_sec_news,
     }
+    for source_name in RSS_SOURCE_FEEDS:
+        fetchers[source_name] = (
+            lambda t, max_items, source_name=source_name: fetch_named_rss_news(
+                t,
+                source=source_name,
+                max_items=max_items,
+            )
+        )
 
     for source in sources:
         fetcher = fetchers.get(source)

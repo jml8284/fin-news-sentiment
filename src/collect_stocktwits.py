@@ -1,11 +1,13 @@
 """
 Fetch Stocktwits symbol streams for dashboard social sourcing.
 
-Primary: api.stocktwits.com JSON stream (may 403 without Partner access).
-Fallback: scrape public symbol page HTML (works when the website loads in a browser).
+Primary: stocktwits.com symbol pages fetched with curl_cffi browser impersonation.
+The public api.stocktwits.com endpoint is disabled by default and only used when
+STOCKTWITS_USE_PUBLIC_API=1 is explicitly set.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -14,6 +16,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 import pandas as pd
 import requests
@@ -26,7 +29,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
 STOCKTWITS_STREAM_URL = "https://api.stocktwits.com/api/2/streams/symbol/{symbol}.json"
+STOCKTWITS_SYMBOL_JSON_URL = "https://stocktwits.com/symbol/{symbol}.json"
 STOCKTWITS_SYMBOL_PAGE = "https://stocktwits.com/symbol/{symbol}"
+STOCKTWITS_SENTIMENT_DETAIL_URL = "https://api-gw-prd.stocktwits.com/sentiment-api/v2/{symbol}/detail"
+STOCKTWITS_PRICE_CHART_URL = "https://ql.stocktwits.com/v2/prices/chart"
+STOCKTWITS_QUOTE_STREAM_URL = "wss://ql-websocket.stocktwits.com/v2/stream"
 
 BROWSER_HEADERS = {
     "User-Agent": (
@@ -81,6 +88,10 @@ def _use_web_only() -> bool:
     return os.getenv("STOCKTWITS_USE_WEB", "").strip().lower() in {"1", "true", "yes"}
 
 
+def _use_public_api() -> bool:
+    return os.getenv("STOCKTWITS_USE_PUBLIC_API", "0").strip().lower() in {"1", "true", "yes"}
+
+
 def _web_fallback_enabled() -> bool:
     return os.getenv("STOCKTWITS_WEB_FALLBACK", "0").strip().lower() in {"1", "true", "yes"}
 
@@ -99,7 +110,7 @@ def _curl_impersonate_profile() -> str:
 
 def stocktwits_transport_label() -> str:
     if _curl_impersonate_enabled():
-        return f"curl_cffi ({_curl_impersonate_profile()}); requests/cloudscraper fallback on connection errors"
+        return f"stocktwits.com via curl_cffi ({_curl_impersonate_profile()}); requests/cloudscraper fallback"
     return "requests; cloudscraper fallback on connection errors"
 
 
@@ -203,8 +214,24 @@ def _fetch_symbol_page_html(symbol: str, *, timeout: int) -> str:
     raise RuntimeError("Failed to fetch Stocktwits symbol page. " + " | ".join(errors))
 
 
+def _fetch_symbol_page_html(symbol: str, *, timeout: int) -> str:
+    """Fetch Stocktwits symbol page HTML via curl impersonation first."""
+    url = STOCKTWITS_SYMBOL_PAGE.format(symbol=symbol.upper())
+    status, html, content_type = _fetch_url(url, timeout=timeout)
+    if status != 200:
+        preview = (html or "")[:120].replace("\n", " ")
+        raise RuntimeError(f"HTTP {status} from Stocktwits web page: {preview}")
+    if "text/html" not in content_type.lower() and "<html" not in html[:500].lower():
+        raise RuntimeError(f"unexpected content type from Stocktwits page: {content_type or 'unknown'}")
+    if len(html) < 1000:
+        raise RuntimeError("response too short (possible block page)")
+    if "RichTextMessage_body" not in html and "__NEXT_DATA__" not in html:
+        raise RuntimeError("page missing message content (possible block page or changed markup)")
+    return html
+
+
 def _allow_sample() -> bool:
-    return os.getenv("STOCKTWITS_ALLOW_SAMPLE", "1").strip().lower() not in {"0", "false", "no"}
+    return os.getenv("STOCKTWITS_ALLOW_SAMPLE", "0").strip().lower() in {"1", "true", "yes"}
 
 
 SAMPLE_PATH = PROJECT_ROOT / "data" / "samples" / "stocktwits_messages.json"
@@ -363,6 +390,278 @@ def _fetch_via_web(symbol: str, *, max_items: int, timeout: int) -> tuple[pd.Dat
     return df, None
 
 
+def _fetch_via_frontend_json(symbol: str, *, max_items: int, timeout: int) -> tuple[pd.DataFrame, str | None]:
+    """Fetch the symbol feed JSON request used by stocktwits.com pages."""
+    candidates = [
+        f"{STOCKTWITS_STREAM_URL.format(symbol=symbol)}?filter=top&limit={max_items}",
+        STOCKTWITS_STREAM_URL.format(symbol=symbol),
+        f"{STOCKTWITS_SYMBOL_JSON_URL.format(symbol=symbol)}?filter=top&limit={max_items}",
+        STOCKTWITS_SYMBOL_JSON_URL.format(symbol=symbol),
+    ]
+    errors: list[str] = []
+    for url in candidates:
+        status, text, content_type = _fetch_url(url, timeout=timeout)
+        if status != 200:
+            preview = (text or "")[:90].replace("\n", " ")
+            errors.append(f"{url}: HTTP {status} {preview}")
+            continue
+        stripped = (text or "").strip()
+        if not stripped or stripped.startswith("<!") or "text/html" in content_type.lower():
+            errors.append(f"{url}: HTML/empty response")
+            continue
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{url}: invalid JSON {exc}")
+            continue
+
+        df = _parse_messages(payload, symbol, max_items=max_items)
+        if not df.empty:
+            return df, None
+        errors.append(f"{url}: JSON had no messages")
+
+    return pd.DataFrame(columns=MESSAGE_COLUMNS), "; ".join(errors[-2:]) if errors else "no frontend json candidates"
+
+
+def fetch_stocktwits_sentiment_detail(
+    ticker: str,
+    *,
+    timeout: int = 20,
+    end: datetime | None = None,
+) -> tuple[dict, str | None]:
+    """Fetch Stocktwits frontend sentiment/message-volume detail via curl impersonation."""
+    symbol = str(ticker).upper().strip()
+    if not symbol:
+        return {}, "empty ticker"
+
+    end_dt = end or datetime.now(timezone.utc)
+    end_value = end_dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    url = f"{STOCKTWITS_SENTIMENT_DETAIL_URL.format(symbol=symbol)}?end={end_value}"
+    status, text, content_type = _fetch_url(url, timeout=timeout)
+
+    if status != 200:
+        preview = (text or "")[:120].replace("\n", " ")
+        return {}, f"Stocktwits sentiment gateway HTTP {status}: {preview}"
+    if "json" not in content_type.lower() and not text.strip().startswith("{"):
+        return {}, f"Stocktwits sentiment gateway returned non-JSON content: {content_type or 'unknown'}"
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return {}, f"invalid sentiment gateway JSON: {exc}"
+
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return {}, "sentiment gateway response missing data"
+    return data, None
+
+
+def fetch_stocktwits_chart_data(
+    ticker: str,
+    *,
+    zoom: str = "1d",
+    timeout: int = 20,
+) -> tuple[pd.DataFrame, str | None]:
+    """Fetch the Stocktwits chart time series used by the symbol page."""
+    symbol = str(ticker).upper().strip()
+    if not symbol:
+        return pd.DataFrame(), "empty ticker"
+
+    params = urlencode(
+        {
+            "symbol": symbol,
+            "zoom": str(zoom).lower(),
+            "extended-granularity": "true",
+        }
+    )
+    url = f"{STOCKTWITS_PRICE_CHART_URL}?{params}"
+    status, text, content_type = _fetch_url(url, timeout=timeout)
+    if status != 200:
+        preview = (text or "")[:120].replace("\n", " ")
+        return pd.DataFrame(), f"Stocktwits chart HTTP {status}: {preview}"
+    if "json" not in content_type.lower() and not (text or "").strip().startswith("{"):
+        return pd.DataFrame(), f"Stocktwits chart returned non-JSON content: {content_type or 'unknown'}"
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return pd.DataFrame(), f"invalid Stocktwits chart JSON: {exc}"
+
+    points = payload.get("data")
+    if not isinstance(points, list):
+        return pd.DataFrame(), "Stocktwits chart response missing data points"
+
+    rows: list[dict[str, object]] = []
+    for item in points:
+        if not isinstance(item, dict):
+            continue
+        rows.append(
+            {
+                "ticker": symbol,
+                "datetime": item.get("start_time"),
+                "open": item.get("open"),
+                "high": item.get("high"),
+                "low": item.get("low"),
+                "close": item.get("close"),
+                "volume": item.get("volume"),
+                "sentiment_score": item.get("sentiment_normalized"),
+                "message_volume_score": item.get("message_volume_normalized"),
+                "watchers_count": item.get("watchers_count"),
+                "session_type": item.get("session_type"),
+            }
+        )
+
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame, "Stocktwits chart returned no rows"
+    frame["datetime"] = pd.to_datetime(frame["datetime"], errors="coerce", utc=True)
+    for col in (
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "sentiment_score",
+        "message_volume_score",
+        "watchers_count",
+    ):
+        frame[col] = pd.to_numeric(frame[col], errors="coerce")
+    frame = frame.dropna(subset=["datetime", "close"]).sort_values("datetime").reset_index(drop=True)
+    if frame.empty:
+        return frame, "Stocktwits chart rows had no parseable datetime/close"
+    return frame, None
+
+
+def _quote_payload_to_row(symbol: str, payload: dict[str, object]) -> dict[str, object] | None:
+    if str(payload.get("symbol", "")).upper() != symbol.upper():
+        return None
+    combined = payload.get("combined")
+    extended = payload.get("extended_hours")
+    if not isinstance(combined, dict):
+        combined = {}
+    if not isinstance(extended, dict):
+        extended = {}
+
+    price = combined.get("price")
+    timestamp = combined.get("timestamp")
+    session_type = extended.get("session_type") or "REGULAR"
+    if price is None:
+        price = extended.get("price")
+        timestamp = extended.get("timestamp")
+        session_type = extended.get("session_type") or session_type
+    if price is None:
+        price = payload.get("last")
+        timestamp = payload.get("timestamp")
+    if price is None or timestamp is None:
+        return None
+
+    return {
+        "ticker": symbol.upper(),
+        "datetime": timestamp,
+        "open": payload.get("open"),
+        "high": payload.get("high"),
+        "low": payload.get("low"),
+        "close": price,
+        "volume": payload.get("volume"),
+        "sentiment_score": pd.NA,
+        "message_volume_score": pd.NA,
+        "watchers_count": pd.NA,
+        "session_type": session_type,
+        "source": "Stocktwits websocket quote",
+    }
+
+
+async def _fetch_stocktwits_realtime_quotes_async(
+    symbol: str,
+    *,
+    duration_seconds: float,
+    timeout: int,
+) -> list[dict[str, object]]:
+    import websockets
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "en,zh;q=0.9,zh-CN;q=0.8",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    }
+    config = {
+        "message_type": "NEW_CONFIG",
+        "payload": {
+            "symbols": [symbol.upper()],
+            "chart_symbols": [symbol.upper()],
+            "symbol_stream_id": 37011,
+        },
+    }
+    rows: list[dict[str, object]] = []
+    deadline = time.monotonic() + max(1.0, float(duration_seconds))
+    async with websockets.connect(
+        STOCKTWITS_QUOTE_STREAM_URL,
+        origin="https://stocktwits.com",
+        additional_headers=headers,
+        compression="deflate",
+        open_timeout=timeout,
+    ) as ws:
+        await ws.send(json.dumps(config))
+        while time.monotonic() < deadline:
+            wait_for = max(0.5, min(5.0, deadline - time.monotonic()))
+            try:
+                message = await asyncio.wait_for(ws.recv(), timeout=wait_for)
+            except asyncio.TimeoutError:
+                continue
+            try:
+                data = json.loads(message)
+            except json.JSONDecodeError:
+                continue
+            message_type = data.get("message_type")
+            payload = data.get("payload")
+            if message_type == "QUOTE" and isinstance(payload, dict):
+                row = _quote_payload_to_row(symbol, payload)
+                if row:
+                    rows.append(row)
+            elif message_type == "QUOTE_BATCH" and isinstance(payload, dict):
+                quote = payload.get(symbol.upper())
+                if isinstance(quote, dict):
+                    row = _quote_payload_to_row(symbol, quote)
+                    if row:
+                        rows.append(row)
+    return rows
+
+
+def fetch_stocktwits_realtime_quotes(
+    ticker: str,
+    *,
+    duration_seconds: float = 6.0,
+    timeout: int = 15,
+) -> tuple[pd.DataFrame, str | None]:
+    """Collect live quote ticks from the Stocktwits websocket for a short window."""
+    symbol = str(ticker).upper().strip()
+    if not symbol:
+        return pd.DataFrame(), "empty ticker"
+    try:
+        rows = asyncio.run(
+            _fetch_stocktwits_realtime_quotes_async(
+                symbol,
+                duration_seconds=duration_seconds,
+                timeout=timeout,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        return pd.DataFrame(), f"Stocktwits websocket unavailable: {exc}"
+
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame, "Stocktwits websocket returned no quote rows"
+    frame["datetime"] = pd.to_datetime(frame["datetime"], errors="coerce", utc=True)
+    for col in ("open", "high", "low", "close", "volume"):
+        frame[col] = pd.to_numeric(frame[col], errors="coerce")
+    frame = frame.dropna(subset=["datetime", "close"]).sort_values("datetime").reset_index(drop=True)
+    if frame.empty:
+        return frame, "Stocktwits websocket rows had no parseable datetime/close"
+    return frame, None
+
+
 def _parse_messages(payload: dict, symbol: str, *, max_items: int) -> pd.DataFrame:
     messages = payload.get("messages")
     if not isinstance(messages, list):
@@ -426,7 +725,11 @@ def fetch_stocktwits_messages_with_error(
     if not symbol:
         return pd.DataFrame(columns=MESSAGE_COLUMNS), "empty ticker"
 
-    if _use_web_only():
+    frontend_df, frontend_err = _fetch_via_frontend_json(symbol, max_items=max_items, timeout=timeout)
+    if not frontend_df.empty:
+        return frontend_df, None
+
+    if _use_web_only() or not _use_public_api():
         df, err = _fetch_via_web(symbol, max_items=max_items, timeout=timeout)
         if not df.empty:
             return df, None
@@ -435,6 +738,11 @@ def fetch_stocktwits_messages_with_error(
             if not df.empty:
                 return df, None
             err = f"{err}; sample: {sample_err}"
+        if not _use_public_api():
+            return (
+                pd.DataFrame(columns=MESSAGE_COLUMNS),
+                f"frontend json failed ({frontend_err}); web/curl-impersonate scrape failed ({err}); public API disabled",
+            )
         return pd.DataFrame(columns=MESSAGE_COLUMNS), err
 
     url = STOCKTWITS_STREAM_URL.format(symbol=symbol)

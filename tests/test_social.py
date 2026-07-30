@@ -64,11 +64,37 @@ def test_fetch_bluesky_social_posts_parses_search_json() -> None:
     assert df.iloc[0]["social_sentiment"] == "Bullish"
 
 
+def test_fetch_social_posts_parses_stocktwits_messages() -> None:
+    payload = pd.DataFrame(
+        [
+            {
+                "ticker": "AAPL",
+                "title": "$AAPL live Stocktwits post",
+                "summary": "",
+                "published": "2026-07-10T12:00:00Z",
+                "collected_at": "2026-07-10 12:00:01 UTC",
+                "source": "Stocktwits",
+                "url": "https://stocktwits.com/symbol/AAPL/message/1",
+                "stocktwits_sentiment": "Bullish",
+            }
+        ]
+    )
+    with patch("src.collect_social._social_source", return_value="stocktwits"):
+        with patch("src.collect_stocktwits.fetch_stocktwits_messages_with_error", return_value=(payload, None)):
+            df, err = fetch_social_posts_with_error("AAPL")
+
+    assert err is None
+    assert len(df) == 1
+    assert df.iloc[0]["source"] == "Stocktwits"
+    assert df.iloc[0]["social_sentiment"] == "Bullish"
+
+
 def test_fetch_social_posts_sample_fallback() -> None:
     with patch("src.collect_social._subreddits", return_value=["stocks"]):
         with patch("src.collect_social._fetch_url", return_value=(403, "Forbidden", "text/html")):
-            with patch("src.collect_social._social_source", return_value="reddit"):
-                df, err = fetch_social_posts_with_error("AAPL")
+            with patch("src.collect_social._allow_sample", return_value=True):
+                with patch("src.collect_social._social_source", return_value="reddit"):
+                    df, err = fetch_social_posts_with_error("AAPL")
 
     assert err is None
     assert len(df) >= 1

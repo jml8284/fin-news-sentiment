@@ -1,8 +1,7 @@
-"""Fetch social posts without depending on Stocktwits.
+"""Fetch social posts for the dashboard.
 
-Primary source: Bluesky public XRPC search via ``api.bsky.app``.
-Reddit remains available as an optional fallback/reference source, but Reddit
-currently blocks many proxy/network-policy requests.
+Primary source: Stocktwits symbol streams.
+Bluesky and Reddit remain available as optional fallback/reference sources.
 """
 from __future__ import annotations
 
@@ -60,7 +59,7 @@ def _utc_now() -> str:
 
 
 def _social_source() -> str:
-    return os.getenv("SOCIAL_SOURCE", "bluesky").strip().lower() or "bluesky"
+    return os.getenv("SOCIAL_SOURCE", "stocktwits").strip().lower() or "stocktwits"
 
 
 def _proxy_url() -> str:
@@ -96,7 +95,7 @@ def _curl_impersonate_enabled() -> bool:
 
 
 def _allow_sample() -> bool:
-    return os.getenv("SOCIAL_ALLOW_SAMPLE", "1").strip().lower() not in {"0", "false", "no"}
+    return os.getenv("SOCIAL_ALLOW_SAMPLE", "0").strip().lower() in {"1", "true", "yes"}
 
 
 def _min_request_interval_sec() -> float:
@@ -393,6 +392,32 @@ def fetch_reddit_social_posts(
     return pd.DataFrame(columns=SOCIAL_COLUMNS), err
 
 
+def fetch_stocktwits_social_posts(
+    ticker: str,
+    *,
+    max_items: int = 30,
+    timeout: int = 20,
+) -> tuple[pd.DataFrame, str | None]:
+    """Fetch live Stocktwits messages and normalize them to SOCIAL_COLUMNS."""
+    from src.collect_stocktwits import fetch_stocktwits_messages_with_error
+
+    df, err = fetch_stocktwits_messages_with_error(
+        ticker,
+        max_items=max_items,
+        timeout=timeout,
+    )
+    if df.empty:
+        return pd.DataFrame(columns=SOCIAL_COLUMNS), err
+
+    out = df.copy()
+    if "stocktwits_sentiment" in out.columns:
+        out = out.rename(columns={"stocktwits_sentiment": "social_sentiment"})
+    for col in SOCIAL_COLUMNS:
+        if col not in out.columns:
+            out[col] = ""
+    return out[SOCIAL_COLUMNS], err
+
+
 def _sample_social_posts(ticker: str, *, max_items: int) -> pd.DataFrame:
     from src.news_filters import utc_today
 
@@ -435,9 +460,11 @@ def fetch_social_posts_with_error(
     timeout: int = 6,
     max_subreddits: int | None = None,
 ) -> tuple[pd.DataFrame, str | None]:
-    """Return social posts for a ticker without calling Stocktwits."""
+    """Return social posts for a ticker from the configured social source."""
     source = _social_source()
-    if source == "bluesky":
+    if source == "stocktwits":
+        df, err = fetch_stocktwits_social_posts(ticker, max_items=max_items, timeout=timeout)
+    elif source == "bluesky":
         df, err = fetch_bluesky_social_posts(ticker, max_items=max_items, timeout=timeout)
     elif source == "reddit":
         df, err = fetch_reddit_social_posts(

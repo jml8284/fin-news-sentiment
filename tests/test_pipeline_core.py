@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from src.clean_data import clean_frame, clean_text
-from src.dashboard import filter_table
+from src.dashboard import build_keyword_signals, build_message_keyword_flags, build_signal_dashboard_table, filter_table
 from src.merge_data import merge_stock_and_sentiment
 from src.ticker_ranking import density_bucket, rank_tickers
 
@@ -56,7 +56,7 @@ def test_rank_tickers_uses_finviz_news_only() -> None:
             },
         ]
     )
-    ranked = rank_tickers(df)
+    ranked = rank_tickers(df, rolling_window_days=None)
     scag = ranked[ranked["ticker"] == "SCAG"].iloc[0]
     aaa = ranked[ranked["ticker"] == "AAA"].iloc[0]
     assert scag["news_count"] == 0
@@ -148,3 +148,74 @@ def test_filter_table_sector_and_min_news() -> None:
     out = filter_table(df, sector="Tech", min_news=3)
     assert len(out) == 1
     assert out.iloc[0]["ticker"] == "A"
+
+
+def test_keyword_signals_detect_gossip_and_squeeze_terms() -> None:
+    scored = pd.DataFrame(
+        [
+            {
+                "ticker": "AAA",
+                "title": "Rumor of FDA approval and short squeeze",
+                "summary": "Traders say low float setup could move soon",
+            }
+        ]
+    )
+
+    signals = build_keyword_signals(scored, ["AAA"])
+
+    row = signals.iloc[0]
+    assert row["gossip_hits"] >= 1
+    assert row["squeeze_hits"] >= 1
+    assert row["catalyst_hits"] >= 1
+
+
+def test_signal_dashboard_table_adds_ai_reason_and_gossip_flag() -> None:
+    filtered = pd.DataFrame(
+        [
+            {
+                "ticker": "AAA",
+                "company": "Alpha Test",
+                "price": 1.25,
+                "change_pct": 42.0,
+                "volume": 5_000_000,
+                "news_count": 4,
+                "sentiment_rank": 1,
+            }
+        ]
+    )
+    scored = pd.DataFrame(
+        [
+            {
+                "ticker": "AAA",
+                "title": "Heard buyout rumor as low float squeeze builds",
+                "summary": "Possible partnership news",
+            }
+        ]
+    )
+
+    signals = build_signal_dashboard_table(filtered, scored, ["AAA"])
+
+    assert "ai_reason" in signals.columns
+    assert "gossip_flag" in signals.columns
+    assert signals.iloc[0]["gossip_flag"] == "Possible rumor"
+    assert "keyword group" in signals.iloc[0]["ai_reason"]
+
+
+def test_message_keyword_flags_marks_social_posts() -> None:
+    messages = pd.DataFrame(
+        [
+            {
+                "ticker": "AAA",
+                "title": "$AAA heard buyout rumor, low float squeeze",
+                "summary": "",
+                "published": "2026-07-30T10:00:00Z",
+                "url": "https://stocktwits.com/symbol/AAA/message/1",
+            }
+        ]
+    )
+
+    flagged = build_message_keyword_flags(messages)
+
+    assert flagged.iloc[0]["keyword_hits"] >= 2
+    assert flagged.iloc[0]["gossip_hits"] == 1
+    assert flagged.iloc[0]["squeeze_hits"] == 1

@@ -1,0 +1,6 @@
+screener_rank,ticker,company,exchange,price,change_pct,volume,market_cap,premarket_change_pct,postmarket_change_pct,relative_volume_10d,sector,industry,source,source_url,fetched_at
+1,AMMPF,AmmPower Corp.,OTC,0.005,499900.0,100205,3674284.6908,,,0.5335823259940137,Non-Energy Minerals,Other Metals/Minerals,TradingView,https://www.tradingview.com/symbols/OTC-AMMPF/,2026-07-30T09:24:16.182615+00:00
+2,SONG,"Music Licensing, Inc.",OTC,0.0002,19900.000000000004,6345000,0.9999999999999999,,,0.8386649912576609,Commercial Services,Miscellaneous Commercial Services,TradingView,https://www.tradingview.com/symbols/OTC-SONG/,2026-07-30T09:24:16.182615+00:00
+3,XREG,XR ENERGY INC,OTC,0.0001,9900.000000000002,1280000,4391.900000000001,,,2.9549981485089725,Commercial Services,Miscellaneous Commercial Services,TradingView,https://www.tradingview.com/symbols/OTC-XREG/,2026-07-30T09:24:16.182615+00:00
+4,AGYP,Allied Energy Corporation,OTC,0.0001,9900.000000000002,68659096,407168.53,,,24.09917900955633,Process Industries,Chemicals: Agricultural,TradingView,https://www.tradingview.com/symbols/OTC-AGYP/,2026-07-30T09:24:16.182615+00:00
+5,RGBP,"Regen Biopharma, Inc.",OTC,0.0001,9900.000000000002,15229017,143527.99999999997,,,0.2747290872777491,Health Technology,Biotechnology,TradingView,https://www.tradingview.com/symbols/OTC-RGBP/,2026-07-30T09:24:16.182615+00:00

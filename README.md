@@ -1,239 +1,345 @@
 # Financial News Sentiment Analysis Dashboard
-> **IST 495 Summer 2026** — internship project (remote).  
-> Main language: **Python** · Repository: **fin-news-sentiment**
-## Project description
-This project builds a **Python-based financial news sentiment analysis and stock ticker ranking system**.
-The system will:
-- Collect financial news related to stock tickers  
-- Analyze the sentiment of each news item  
-- Calculate **message density**  
-- Display **ranked tickers** in a dashboard  
-The final dashboard is planned to work like a **stock screener**: users can view ticker-level sentiment scores, recent news activity, and related articles.
-The work ties to the internship theme of using **generative AI** and **agentic AI** to analyze financial news and stock-related information. The stack may include AI-assisted tooling (e.g. ChatGPT, Microsoft Copilot, Gemini, Claude, CrewAI, or other agent builders) for coding, prompt design, and workflow automation.
----
-## Main goals
-1. Collect financial news from online sources, RSS feeds, or other financial news platforms  
-2. Clean and organize collected news data  
-3. Identify related stock tickers from titles, summaries, or article body  
-4. Analyze sentiment for each financial news item  
-5. Calculate ticker-level sentiment scores  
-6. Calculate **message density** per ticker (volume of related news)  
-7. Rank tickers using sentiment and news activity  
-8. Build a dashboard for ranked tickers, scores, density, and recent news  
-9. Document the project so others can run it on a separate machine  
----
-## Planned project structure
-```
+
+IST 495 Summer 2026 internship project by Jinyang Liu.
+
+This project is a Python dashboard for fast financial news, stock screener, sentiment, and Stocktwits social activity monitoring. It combines live Finviz data, news sentiment scoring, Stocktwits chart/social indicators, realtime quote checks, correlation checks, and alert logic in one Streamlit application.
+
+## Current Status
+
+The project is ready for final internship demonstration and delivery preparation.
+
+Implemented:
+
+- Live Finviz Elite screener for ranked stock candidates.
+- TradingView numeric screener collector for a second market-data view of price, volume, market cap, pre-market, and post-market change fields.
+- Live Finviz news collection and VADER sentiment scoring.
+- Public RSS/newswire collection for GlobeNewswire, PR Newswire, SEC, FDA, and custom RSS feeds.
+- Ranked ticker table with sorting, thresholding, sentiment rank, news count, and message density.
+- Signals tab with dictionary keyword screening, numeric score, AI-style combined ranking, short-squeeze proxy score, and long-term watchlist hints.
+- Professor checklist coverage tab that separates completed features, prototype features, and future infrastructure work.
+- Configurable alert thresholds for realtime price movement, chart-window price movement, volume spikes, and social sentiment/message-volume scores.
+- Current ticker report export for demo notes and handoff documentation.
+- Finviz-style price chart with optional SMA overlays.
+- Stocktwits social tab with Stocktwits chart data, parsed message rows when available, and sentiment/message-volume visualization.
+- Stocktwits WebSocket quote check during dashboard refresh.
+- One-minute dashboard refresh cycle for current-session realtime quote updates.
+- Data freshness panel showing chart latest time, WebSocket check time, live quote latest time, and social latest time.
+- Alerts for realtime price movement, chart-window price/volume movement, and latest social sentiment/message-volume signals.
+- Alert history and CSV export.
+- Correlation analysis between price movement, stock volume, message volume, and sentiment.
+- FastAPI wrapper for Stocktwits chart, sentiment, and realtime quote snapshots.
+- API endpoints for feature coverage, alert rules, and per-ticker demo reports.
+- MongoDB storage module for optional resting database work.
+- Local tests for parser, sentiment, Finviz, and Stocktwits helper logic.
+- Railway deployment files, final demo script, technical recording script, delivery guide, and AI prompt log.
+
+## Important Realtime Note
+
+Stocktwits returns historical chart bars at its own interval. For example, older 1D or 1W chart bars may be 5-minute, 10-minute, or 30-minute bars depending on the symbol, market session, and what Stocktwits returns.
+
+The dashboard adds a realtime layer after the app starts:
+
+- The Stocktwits chart endpoint provides the historical chart window.
+- The Stocktwits WebSocket provides the latest quote check.
+- Streamlit refreshes every 60 seconds when auto-refresh is enabled.
+- New quotes collected after the program starts can be appended to the visible chart.
+
+This means the app can monitor realtime movement while running, but it cannot reconstruct one-minute historical Stocktwits data from before the app was started if Stocktwits only returned 5-minute or 10-minute historical bars.
+
+## Project Structure
+
+```text
 fin-news-sentiment/
-├── README.md
-├── requirements.txt
-├── data/
-│   ├── datasets/          # local copies of benchmark sentiment corpora (see data/datasets/README.md)
-│   ├── raw/
-│   └── processed/
-├── src/
-│   ├── collect_news.py
-│   ├── clean_data.py
-│   ├── sentiment_analysis.py
-│   ├── ticker_ranking.py
-│   └── dashboard.py
-├── notebooks/
-│   └── exploration.ipynb
-└── reports/
-    └── weekly_updates/
+  README.md
+  requirements.txt
+  .env.example
+  src/
+    dashboard.py              # Streamlit dashboard
+    api.py                    # Optional FastAPI endpoint
+    collect_stocks.py         # Finviz screener collection
+    collect_news.py           # News collection
+    collect_stocktwits.py     # Stocktwits chart, sentiment, websocket, messages
+    sentiment_analysis.py     # Sentiment pipeline
+    sentiment_engines.py      # VADER / FinBERT helper layer
+    ticker_ranking.py         # Ticker ranking logic
+    merge_data.py             # Merge screener + sentiment outputs
+    run_pipeline.py           # Pipeline runner
+    store_mongo.py            # Optional MongoDB storage
+  data/
+    raw/
+    processed/
+    datasets/
+    samples/
+  reports/
+    weekly_updates/
+  scripts/
+  tests/
 ```
-### Folder descriptions
-| Path | Purpose |
-|------|--------|
-| **`data/datasets/`** | Curated **labeled** finance sentiment datasets for modeling / evaluation (not live RSS news). |
-| **`data/raw/`** | Original collected news before cleaning. Example: `raw_news_data.csv` |
-| **`data/processed/`** | Cleaned / analysis-ready data. Examples: `cleaned_news_data.csv`, `sentiment_results.csv`, `ticker_ranking.csv`, `final_dataset.csv` |
-| **`src/`** | Main Python modules (see below) |
-| **`notebooks/`** | Exploratory work. `exploration.ipynb` — tests for cleaning, sentiment, and visualizations |
-| **`reports/weekly_updates/`** | Weekly internship updates (completed work, challenges, next steps, deliverables) |
-### Planned `src/` modules
-| File | Role |
-|------|------|
-| `collect_news.py` | Collect financial news (RSS or other sources) |
-| `clean_data.py` | Clean raw data for analysis |
-| `sentiment_analysis.py` | Sentiment per news item |
-| `ticker_ranking.py` | Ticker-level scores and message density |
-| `merge_data.py` | Merge stock screener data with sentiment rankings |
-| `run_pipeline.py` | Run the full pipeline with one command |
-| `dashboard.py` | Run the dashboard app |
-| `dataset_loaders.py` | Load benchmark CSV/txt corpora from `data/datasets/` into a common `text` / `label` schema |
----
-## Labeled benchmark datasets (local)
 
-Three local corpora are organized under `data/datasets/`:
+## Setup
 
-- **Financial PhraseBank v1.0** — sentence-level labels (`Sentences_AllAgree.txt`, plus other agreement cuts).
-- **`all-data.csv`** — two-column file (`label`, `sentence`) for supervised sentiment.
-- **`SEntFiN-v1.1.csv`** — headlines with JSON entity sentiments in `Decisions` (loader derives a simple headline-level label by **majority vote** over entities).
-
-Details, paths, and citation reminders: `data/datasets/README.md`.  
-Quick smoke test (from repo root): `python -m src.dataset_loaders`
-
----
-## Tools and technologies
-- Python  
-- pandas  
-- requests  
-- BeautifulSoup  
-- feedparser  
-- nltk or VADER  
-- Hugging Face models or FinBERT  
-- Streamlit  
-- GitHub  
-- AI tools (ChatGPT, Copilot, Gemini, Claude, CrewAI, etc.)  
----
-## Planned workflow
-```mermaid
-flowchart TD
-    A[Financial news sources] --> B[Data collection]
-    B --> C[Data cleaning]
-    C --> D[Ticker matching]
-    D --> E[Sentiment analysis]
-    E --> F[Ticker-level aggregation]
-    F --> G[Message density calculation]
-    G --> H[Dashboard visualization]
-```
----
-## Data collection plan
-Start from accessible sources (RSS, public financial news pages), including market and stock-related feeds.
-**Planned fields:**
-- News title  
-- Summary or article text  
-- Published time  
-- Source name  
-- URL  
-- Related stock ticker  
----
-## Sentiment analysis plan
-1. Start with a **simple baseline** (e.g. VADER, TextBlob).  
-2. After the baseline works, optionally try **finance-specific** models (e.g. FinBERT, other transformers).  
-**Per-item labels:** Positive · Neutral · Negative  
-**Optional:** store a continuous **sentiment score** per item.
----
-## Ticker ranking plan
-**Possible ticker-level metrics:**
-- Average sentiment score  
-- Count of related news articles  
-- Positive / negative news ratios  
-- Message density  
-- Latest sentiment score  
-**Example ranking table:**
-| Ticker | Average sentiment | News count | Message density | Rank |
-|--------|-------------------|------------|-----------------|------|
-| AAPL | 0.35 | 20 | High | 1 |
-| TSLA | -0.20 | 35 | High | 2 |
-| NVDA | 0.50 | 18 | Medium | 3 |
----
-## Dashboard plan
-**Planned UI content:**
-- Ranked tickers  
-- Sentiment scores  
-- Message density  
-- Recent news articles  
-- Sentiment distribution charts  
-- Filters: ticker, source, time range  
-**Framework:** Streamlit (planned).
----
-## How to run
-Instructions will be updated as the project grows.
-**Setup (planned):**
-```bash
-pip install -r requirements.txt
-```
-**Dashboard (planned):**
-```bash
-streamlit run src/dashboard.py
-```
----
-## Current status
-**Stage:** Production pipeline — Finviz Elite 20-stock screener, per-ticker news, VADER sentiment, merge, Streamlit dashboard (demo optional for offline dev).
-
-### Completed
-- [x] GitHub repository and project structure
-- [x] Finviz stock collection (`collect_stocks.py`)
-- [x] Per-ticker news collection — Google, Yahoo, Finviz (`collect_news.py`)
-- [x] Data cleaning with HTML stripping (`clean_data.py`)
-- [x] VADER baseline sentiment (`sentiment_analysis.py`)
-- [x] Ticker ranking and message density (`ticker_ranking.py`)
-- [x] Stock + sentiment merge (`merge_data.py`)
-- [x] One-command pipeline runner (`run_pipeline.py`)
-- [x] Streamlit dashboard with filters, charts, and news viewer (`dashboard.py`)
-- [x] Benchmark dataset loaders (`dataset_loaders.py`)
-- [x] Weekly updates (weeks 1–4)
-
-### Next steps
-- [ ] Review VADER eval report; consider FinBERT if accuracy is low
-- [ ] Social news sources (Stocktwits) per professor roadmap
-- [ ] Redis caching for faster refresh
-- [ ] Add automated tests for parsers and merge logic
----
-## Internship information
-| Item | Detail |
-|------|--------|
-| Course | IST 495 Summer 2026 Internship |
-| Topic | Financial News Sentiment Analysis |
-| Student | Jinyang Liu |
-| Repository | fin-news-sentiment |
-| Work mode | Remote |
-| Language | Python |
----
-## Quick start (production)
-
-### 1. Setup
+Create a virtual environment and install dependencies:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
-Add your **Finviz Elite API token** to `.env`:
+Copy the environment template:
+
+```bash
+copy .env.example .env
+```
+
+Add your Finviz Elite token:
 
 ```bash
 FINVIZ_API_TOKEN=your-token-here
 ```
 
-Get the token from: https://elite.finviz.com/api_explanation
+Optional API token for the FastAPI wrapper:
 
-### 2. Run pipeline (default: 20-stock Technical screener)
+```bash
+FIN_NEWS_API_TOKEN=your-local-api-token
+```
+
+## Run The Dashboard
+
+```bash
+streamlit run src/dashboard.py
+```
+
+Local URL:
+
+```text
+http://localhost:8501
+```
+
+Useful Windows command:
+
+```bash
+.venv\Scripts\python.exe -m streamlit run src\dashboard.py --server.port 8501 --server.address localhost
+```
+
+## Run The Pipeline
 
 ```bash
 python -m src.run_pipeline --evaluate
-streamlit run src/dashboard.py
 ```
 
-This runs:
-1. Finviz Elite export — professor Technical filters (`change up`, high volume)
-2. News per ticker — Finviz Elite + Google + Yahoo + SEC
-3. Clean → VADER sentiment → rank → merge → `final_dataset.csv`
-4. VADER benchmark evaluation → `vader_eval_report.csv`
-
-Optional MongoDB: `python -m src.run_pipeline --evaluate --mongo`
-
-### Step by step
+Collect only live news rows:
 
 ```bash
-python -m src.collect_stocks --elite --top-n 20
-python -m src.collect_news --from-stocks --top-n 20
-python -m src.clean_data
-python -m src.sentiment_analysis
-python -m src.ticker_ranking
-python -m src.merge_data
-streamlit run src/dashboard.py
+python -m src.collect_news --from-stocks --sources finviz,google,yahoo,globalwire,prnewswire,sec,fda --top-n 20
 ```
 
-### Offline demo (development only)
+Collect TradingView numeric screener rows:
 
 ```bash
-python -m src.run_pipeline --demo
+python -m src.collect_tradingview --top-n 20 --min-volume 100000 --out data/raw/tradingview_screener.csv
 ```
 
----
-## Notes
-This project is **under development**. This README will be updated during the internship as code, data pipelines, and dashboard features are added.
+Add a custom RSS feed:
+
+```bash
+python -m src.collect_news --rss https://example.com/feed.xml --out data/raw/custom_rss_news.csv
+```
+
+Optional MongoDB storage:
+
+```bash
+python -m src.run_pipeline --evaluate --mongo
+```
+
+## Optional API
+
+Start the API:
+
+```bash
+uvicorn src.api:app --host 127.0.0.1 --port 8000
+```
+
+Health check:
+
+```text
+GET /health
+```
+
+Stocktwits snapshot:
+
+```text
+GET /stocktwits/{ticker}?zoom=1d&include_realtime=true
+```
+
+Professor checklist coverage:
+
+```text
+GET /features
+```
+
+TradingView screener:
+
+```text
+GET /tradingview/screener?top_n=20&min_volume=100000&sort_by=change
+```
+
+Alert rule documentation:
+
+```text
+GET /alerts/rules
+```
+
+Compact ticker demo report:
+
+```text
+GET /stocktwits/{ticker}/demo-report?zoom=1d
+```
+
+If `FIN_NEWS_API_TOKEN` is set, send it as:
+
+```text
+X-API-Token: your-local-api-token
+```
+
+## Dashboard Walkthrough
+
+### Finviz Filters
+
+The sidebar controls the Finviz news date range, sector filter, minimum news count, sort field, and sort order.
+
+### Live Finviz Chart
+
+The Finviz chart tab displays price bars and SMA overlays for the selected ticker. The optional K-line rolling window can zoom the Finviz chart without changing the Stocktwits social tab.
+
+### Ranked Tickers
+
+The ranked table combines live screener data with news sentiment, news count, and message density. It supports sorting, thresholding, and CSV export.
+
+### News Viewer
+
+The news viewer shows collected news rows with ticker, title, summary, source, published time, URL, and sentiment fields.
+
+### Social / Stocktwits
+
+The Social tab includes:
+
+- Stocktwits chart range selector: 1D, 1W, 1M, 3M, 6M, YTD, 1Y, 5Y, All.
+- Stocktwits price line.
+- Stock volume bars.
+- Sentiment line when returned by Stocktwits.
+- Message volume line when returned by Stocktwits.
+- Realtime quote extension from the WebSocket after the program starts.
+- Parsed Stocktwits message rows when Stocktwits web data is available.
+- Per-ticker social counts.
+- Correlation analysis.
+- Data freshness panel.
+- Alerts and alert history export.
+
+## Alerts
+
+The alert section is a prototype signal layer.
+
+Current alert types:
+
+- Realtime Alert: checks price movement using quotes collected after the app starts.
+- Chart Window Alert: checks recent chart-window price movement and volume spikes.
+- Social Latest Alert: checks latest Stocktwits sentiment and message-volume scores.
+
+Alerts are displayed in the dashboard and stored in session memory. The user can export alert history as CSV.
+
+## Final Delivery Files
+
+The repo includes delivery-focused files for the final internship submission:
+
+- `DEMO_SCRIPT.md`: non-technical demo recording outline.
+- `TECHNICAL_RECORDING_SCRIPT.md`: code walkthrough outline.
+- `DELIVERY_GUIDE.md`: final submission checklist and Railway notes.
+- `AI_PROMPT_LOG.md`: short AI-use log for the professor.
+- `Procfile` and `railway.toml`: Railway deployment entrypoint.
+
+Recommended final demo order:
+
+1. Open the Railway URL or local Streamlit URL.
+2. Show Finviz filters and ranked tickers.
+3. Show News viewer and sentiment fields.
+4. Show Signals for keyword, numeric, AI-style, squeeze, and long-term scoring.
+5. Show Social tab with Stocktwits chart, sentiment, message volume, and data freshness.
+6. Show Alerts and export options.
+7. Show Checklist tab and explain Done / Prototype / Future work honestly.
+
+## Data Sources
+
+Primary sources:
+
+- Finviz Elite screener and quote/news data.
+- TradingView public scanner data for numeric screener comparison.
+- GlobeNewswire public RSS feed.
+- PR Newswire public RSS feed.
+- SEC press release RSS feed.
+- FDA press release RSS feed.
+- Custom RSS feeds passed from the command line.
+- Stocktwits chart endpoint.
+- Stocktwits sentiment/detail endpoint when accessible.
+- Stocktwits WebSocket quote stream.
+- Stocktwits message/feed parsing when accessible.
+
+Optional/local:
+
+- Financial PhraseBank.
+- SEntFiN.
+- Local processed CSV outputs from the pipeline.
+- MongoDB if enabled.
+
+## Limitations
+
+- Stocktwits may rate-limit or block some requests.
+- Stocktwits historical bars are returned at Stocktwits' own interval; the app cannot force old historical bars to one-minute resolution.
+- The one-minute refresh applies to the running dashboard session and realtime WebSocket checks.
+- Social message parsing may return fewer rows than the official Stocktwits UI because the public page/feed can be protected.
+- The dashboard is a research and internship prototype, not financial advice or an order execution system.
+
+## Deployment
+
+See `DELIVERY_GUIDE.md` for the full final submission checklist and Railway deployment notes.
+
+Typical Railway command:
+
+```bash
+streamlit run src/dashboard.py --server.address 0.0.0.0 --server.port $PORT
+```
+
+Required environment variable:
+
+```text
+FINVIZ_API_TOKEN
+```
+
+Recommended optional variables:
+
+```text
+SOCIAL_SOURCE=stocktwits
+STOCKTWITS_USE_CURL_IMPERSONATE=1
+STOCKTWITS_USE_PUBLIC_API=0
+STOCKTWITS_ALLOW_SAMPLE=0
+FIN_NEWS_API_TOKEN=your-api-token
+```
+
+## Tests
+
+```bash
+python -m py_compile src/dashboard.py src/collect_stocktwits.py src/collect_tradingview.py src/api.py
+python -m pytest
+```
+
+## Final Deliverables
+
+- Public GitHub repository.
+- Professional README.
+- Railway public URL.
+- Demo recording for a nontechnical user.
+- Technical recording explaining the code structure.
+- Activity logs and weekly updates.
+- AI prompt log.
+- Exit survey / Canvas requirements.
+- OneDrive folder shared with the professor.

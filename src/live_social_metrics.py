@@ -1,7 +1,6 @@
 """Live social metrics for the Streamlit dashboard.
 
-This module replaces the dashboard's Stocktwits dependency with a broader
-social source abstraction. The current live source is Bluesky.
+The default live source is Stocktwits, normalized through collect_social.
 """
 from __future__ import annotations
 
@@ -24,9 +23,16 @@ def _live_ticker_limit() -> int:
 
 def _request_timeout() -> int:
     try:
-        return max(int(os.getenv("SOCIAL_TIMEOUT_SEC", "4")), 1)
+        return max(int(os.getenv("SOCIAL_TIMEOUT_SEC", "20")), 1)
     except ValueError:
-        return 4
+        return 20
+
+
+def _max_items_per_ticker() -> int:
+    try:
+        return max(int(os.getenv("SOCIAL_MAX_ITEMS_PER_TICKER", "100")), 1)
+    except ValueError:
+        return 100
 
 
 def _max_subreddits() -> int:
@@ -79,7 +85,7 @@ def fetch_live_social(tickers: list[str]) -> tuple[pd.DataFrame, list[str]]:
             continue
         df, err = fetch_social_posts_with_error(
             ticker,
-            max_items=30,
+            max_items=_max_items_per_ticker(),
             timeout=_request_timeout(),
             max_subreddits=_max_subreddits(),
         )

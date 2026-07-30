@@ -117,7 +117,7 @@ def _parse_float(value: object) -> float | None:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
     s = str(value).strip().replace(",", "")
-    if not s or s in {"-", "—"}:
+    if not s or s in {"-", "—", "–", "N/A", "n/a"}:
         return None
     try:
         return float(_PCT.sub("", s))
