@@ -10,8 +10,7 @@ This guide is for the final IST 495 stock market project submission.
 - Technical recording MP4.
 - README.md.
 - Delivery guide and checklist.
-- Weekly activity logs.
-- AI prompt log / conversation notes.
+- AI prompt log.
 - Canvas exit assignments and survey.
 - OneDrive parent folder shared with the professor.
 

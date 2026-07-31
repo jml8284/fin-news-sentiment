@@ -1,4 +1,4 @@
-"""Live Stocktwits metrics for the Streamlit dashboard (Week 8 social sourcing)."""
+"""Live Stocktwits metrics for the Streamlit dashboard."""
 from __future__ import annotations
 
 import os

@@ -70,8 +70,6 @@ fin-news-sentiment/
     processed/
     datasets/
     samples/
-  reports/
-    weekly_updates/
   scripts/
   tests/
 ```
@@ -339,7 +337,6 @@ python -m pytest
 - Railway public URL.
 - Demo recording for a nontechnical user.
 - Technical recording explaining the code structure.
-- Activity logs and weekly updates.
 - AI prompt log.
 - Exit survey / Canvas requirements.
 - OneDrive folder shared with the professor.

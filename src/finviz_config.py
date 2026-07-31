@@ -21,7 +21,7 @@ FINVIZ_ELITE_STOCK = "https://elite.finviz.com/stock"
 FINVIZ_ELITE_QUOTE_EXPORT = "https://elite.finviz.com/quote_export"
 FINVIZ_ELITE_SCREENER = "https://elite.finviz.com/screener"
 
-# Professor screener (Canvas Jun 10, 2026):
+# Project screener baseline:
 # v=151, rel volume > 0.75, current volume > 100K, technical change up, sort -change.
 PRESET_TECHNICAL_GAINERS = {
     "filters": "sh_curvol_o100,sh_relvol_o0.75,ta_change_u",

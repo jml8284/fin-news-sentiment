@@ -16,7 +16,6 @@ This project used AI assistance for coding, debugging, documentation, and presen
 - README and delivery documentation.
 - Demo recording script.
 - Technical recording script.
-- Weekly activity log drafting.
 
 ## Prompt Themes
 
