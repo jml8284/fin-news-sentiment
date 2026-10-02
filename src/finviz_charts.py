@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import io
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 import pandas as pd
@@ -281,7 +281,7 @@ def build_finviz_style_chart(
         col=1,
     )
 
-    fetched = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    fetched = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     subtitle = f"{period_label} · live @ {fetched}"
     if window_label:
         subtitle = f"{window_label} · {subtitle}"

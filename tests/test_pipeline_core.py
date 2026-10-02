@@ -34,6 +34,8 @@ def test_density_bucket_thresholds() -> None:
 
 
 def test_rank_tickers_uses_finviz_news_only() -> None:
+    from datetime import date
+
     df = pd.DataFrame(
         [
             {
@@ -56,7 +58,12 @@ def test_rank_tickers_uses_finviz_news_only() -> None:
             },
         ]
     )
-    ranked = rank_tickers(df, rolling_window_days=None)
+    ranked = rank_tickers(
+        df,
+        rolling_window_days=None,
+        window_start=date(2026, 6, 14),
+        window_end=date(2026, 6, 14),
+    )
     scag = ranked[ranked["ticker"] == "SCAG"].iloc[0]
     aaa = ranked[ranked["ticker"] == "AAA"].iloc[0]
     assert scag["news_count"] == 0

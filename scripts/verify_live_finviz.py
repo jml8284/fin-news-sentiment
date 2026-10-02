@@ -2,6 +2,13 @@
 """Verify live Finviz screener + quote-page news scraping (run from repo root)."""
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from src.collect_news import fetch_finviz_news
 from src.collect_stocks import collect_finviz_elite_export
 from src.finviz_config import PRESET_TECHNICAL_GAINERS, get_api_token
